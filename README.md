@@ -24,25 +24,40 @@ This project can be useful if you want to sell your cars and you want to show th
 ### Domain:
 
 The main operations are:
+
 -add_car - adds a car to the garage with some basic information
 usage:
-add car ABC123 BMW e36 touring 1997
+```add car ABC123 BMW e36 touring 1997```
 
 -remove_car - removes a car from the garage
 usage:
-remove car ABC123
+```remove car ABC123```
 
 -list_cars - lists all the cars from the garage
 usage:
-list cars
+```list cars```
 
 -service_car - adds a service to a car with the date of the service (can be recursive to allow multiple services)
 usage:
-service car ABC123 oil change 20-01-2004
-service car ABC123 oil change and tire change 21-01-2005
+```service car ABC123 oil change 20-01-2004```
+```service car ABC123 oil change and tire change 21-01-2005```
 
 -list_services - lists all the services done to a car
 usage:
-list_services ABC123
+```list_services ABC123```
+
+The operations are:
+
+-make - the make of the vehicle
+
+-model - the model of the vehicle (e36, e36 touring ect.)
+
+-license_plate - license plate of the vehicle (used to add services to the specific vehicle and not the model)
+
+-service_type - the service that you are doing to the vehicle
+
+-service_date - the date when the service was completed
+
+
 
 
