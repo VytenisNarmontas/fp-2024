@@ -12,12 +12,37 @@
 
 
 
-Vytenis Narmontas "Car garage" project:
+### Vytenis Narmntas "Car Garage" project:
 
-BNF of a simple car garage.
-Functions:
-    *add car - adds a car to the garage with some basic information
-    *remove car - removes car from garage
-    *list cars - lists all cars in the garage
-    *service car - adds a service to a vehicle with some basic service information (recursive so service can consist of multiple services)
-    *list services - lists all the services done to a car based on the license plate
+### Introuction:
+
+This is a BNF of a simple car garage for personal use.
+I have picked this Domain, because I am interested and have good knowledge of cars. 
+This project allows the user to add and remove cars from their garage aswell as save services and their date of each car.
+This project can be useful if you want to sell your cars and you want to show the buyer a full history of the vehicle they are buying.
+
+### Domain:
+
+The main operations are:
+-add_car - adds a car to the garage with some basic information
+usage:
+add car ABC123 BMW e36 touring 1997
+
+-remove_car - removes a car from the garage
+usage:
+remove car ABC123
+
+-list_cars - lists all the cars from the garage
+usage:
+list cars
+
+-service_car - adds a service to a car with the date of the service (can be recursive to allow multiple services)
+usage:
+service car ABC123 oil change 20-01-2004
+service car ABC123 oil change and tire change 21-01-2005
+
+-list_services - lists all the services done to a car
+usage:
+list_services ABC123
+
+
