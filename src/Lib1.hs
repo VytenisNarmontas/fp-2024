@@ -6,9 +6,9 @@ module Lib1
 -- to be autocompleted in your program's repl.
 completions :: [String]
 completions = 
-    [ "add car ",
-      "remove car ",
-      "list cars ",
-      "service car ",
+    [ "add car",
+      "remove car",
+      "list cars",
+      "service car",
       "list services"
     ]

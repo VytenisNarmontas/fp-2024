@@ -1,10 +1,10 @@
 <command> ::= <add_car> | <remove_car> | <list_cars> | <service_car> | <list_services>
 
-<add_car> ::= "add car " <license_plate> " " <make> " " <model> " " <year>
-<remove_car> ::= "remove car " <license_plate>
+<add_car> ::= "add car" " " <license_plate> " " <make> " " <model> " " <year>
+<remove_car> ::= "remove car" " " <license_plate>
 <list_cars> ::= "list cars"
-<service_car> ::= "service car " <license_plate> " " <service_type> " " <service_date>
-<list_services> ::= "list services " <license_plate>
+<service_car> ::= "service car" " " <license_plate> " " <service_type> " " <service_date>
+<list_services> ::= "list services" " " <license_plate>
 
 <make> ::= <word>
 <model> ::= <alphanumeric>+ | <alphanumeric>+ " " <model>
