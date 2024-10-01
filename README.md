@@ -37,7 +37,7 @@ usage:
 usage:
 ```list cars```
 
--service_car - adds a service to a car with the date of the service (can be recursive to allow multiple services)
+-service_car - adds a service to a car with the date of the service (can be recursive to allow multiple services to be made at the same time)
 usage:
 ```service car ABC123 oil change 20-01-2004```
 ```service car ABC123 oil change and tire change 21-01-2005```
