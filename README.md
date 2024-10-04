@@ -37,10 +37,11 @@ usage:
 usage:
 ```list cars```
 
--service_car - adds a service to a car with the date of the service (can be recursive to allow multiple services to be made at the same time)
+-service_car - adds a service to a car with the date of the service (can be recursive to allow a service contain other services inside)
 usage:
 ```service car ABC123 oil change 20-01-2004```
-```service car ABC123 oil change and tire change 21-01-2005```
+```service car ABC123 oil change, tire change 21-01-2005```
+```service car ABC123 front end(oil change, headlights(clean, bulb change(orange LEDs, white bulbs))), back end(cleaning(windows, tailgate)) 20-20-2024```
 
 -list_services - lists all the services done to a car
 usage:
@@ -54,7 +55,7 @@ The operations are:
 
 -license_plate - license plate of the vehicle (used to add services to the specific vehicle and not the model)
 
--service_type - the service that you are doing to the vehicle
+-service_type - the service that you are doing to the vehicle (recursive to allow services inside services)
 
 -service_date - the date when the service was completed
 
