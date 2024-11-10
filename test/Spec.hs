@@ -12,11 +12,15 @@ tests :: TestTree
 tests = testGroup "Tests" [unitTests]
 
 unitTests :: TestTree
-unitTests = testGroup "Lib1 tests"
-  [ testCase "List of completions is not empty" $
-      null Lib1.completions @?= False,
-    testCase "Parsing case 1 - give a better name" $
-      Lib2.parseQuery "" @?= (Left "Some error message"),
-    testCase "Parsing case 2 - give a better name" $
-      Lib2.parseQuery "o" @?= (Left "Some error message")
+unitTests = testGroup "Lib2 Tests"
+  [ testCase "AddCar parsing" $
+      parseQuery "add car ABC123 Toyota Corolla 2020" @?= Right (AddCar "ABC123" "Toyota" "Corolla" 2020),
+    testCase "RemoveCar parsing" $
+      parseQuery "remove car ABC123" @?= Right (RemoveCar "ABC123"),
+    testCase "ServiceCar parsing" $
+      parseQuery "service car ABC123 Oil 12-12-2022" @?= Right (ServiceCar "ABC123" "Oil" "12-12-2022"),
+    testCase "stateTransition AddCar" $
+      let initialState = emptyState
+          newState = stateTransition (AddCar "ABC123" "Toyota" "Corolla" 2020) initialState
+      in cars newState @?= [Car "ABC123" "Toyota" "Corolla" 2020]
   ]

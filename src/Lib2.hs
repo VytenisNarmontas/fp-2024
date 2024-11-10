@@ -1,44 +1,101 @@
-{-# LANGUAGE InstanceSigs #-}
-module Lib2
-    ( Query(..),
-    parseQuery,
-    State(..),
-    emptyState,
-    stateTransition
-    ) where
+import qualified Data.Char as C
+import qualified Data.List as L
 
--- | An entity which represets user input.
--- It should match the grammar from Laboratory work #1.
--- Currently it has no constructors but you can introduce
--- as many as needed.
-data Query
+type Parser a = String -> Either String (a, String)
 
--- | The instances are needed basically for tests
-instance Eq Query where
-  (==) _ _= False
+-- Helper parsers
+char :: Char -> Parser Char
+char c [] = Left ("Cannot find " ++ [c] ++ " in an empty input")
+char c (x:xs) = if c == x then Right (c, xs) else Left ([c] ++ " is not found at the start")
 
-instance Show Query where
-  show _ = ""
+string :: String -> Parser String
+string "" str = Right ("", str)
+string (c:cs) str = do
+  (_, rest) <- char c str
+  (parsed, rest') <- string cs rest
+  return (c : parsed, rest')
 
--- | Parses user's input.
--- The function must have tests.
-parseQuery :: String -> Either String Query
-parseQuery _ = Left "Not implemented 2"
+whitespace :: Parser String
+whitespace input = Right (span C.isSpace input)
 
--- | An entity which represents your program's state.
--- Currently it has no constructors but you can introduce
--- as many as needed.
-data State
+parseWord :: Parser String
+parseWord input = 
+  let (letters, rest) = span C.isLetter input
+  in if null letters 
+     then Left "Expected a word"
+     else Right (letters, rest)
 
--- | Creates an initial program's state.
--- It is called once when the program starts.
-emptyState :: State
-emptyState = error "Not implemented 1"
+parseNumber :: Parser Int
+parseNumber input = 
+  let (digits, rest) = span C.isDigit input
+  in if null digits 
+     then Left "Expected a number"
+     else Right (read digits, rest)
 
--- | Updates a state according to a query.
--- This allows your program to share the state
--- between repl iterations.
--- Right contains an optional message to print and
--- an updated program's state.
-stateTransition :: State -> Query -> Either String (Maybe String, State)
-stateTransition _ _ = Left "Not implemented 3"
+-- Specific parsers for car parameters
+parseLicensePlate :: Parser String
+parseLicensePlate = parseWord  -- Simplified; assumes license plate is a word
+
+parseMake :: Parser String
+parseMake = parseWord
+
+parseModel :: Parser String
+parseModel = parseWord
+
+parseYear :: Parser Int
+parseYear = parseNumber
+
+-- and combinator for 5 parsers
+and5' :: (a -> b -> c -> d -> e -> f) -> Parser a -> Parser b -> Parser c -> Parser d -> Parser e -> Parser f
+and5' f pa pb pc pd pe = \input -> do
+    (a, r1) <- pa input
+    (b, r2) <- pb r1
+    (c, r3) <- pc r2
+    (d, r4) <- pd r3
+    (e, r5) <- pe r4
+    return (f a b c d e, r5)
+
+-- Command parsers
+parseAddCar :: Parser Query
+parseAddCar = and5' AddCar (string "add car ") parseLicensePlate (string " ") parseMake (string " ") parseModel (string " ") parseYear
+
+parseRemoveCar :: Parser Query
+parseRemoveCar = do
+    (_, rest1) <- string "remove car "
+    (plate, rest2) <- parseLicensePlate rest1
+    return (RemoveCar plate, rest2)
+
+parseListCars :: Parser Query
+parseListCars input = fmap (\(_, rest) -> (ListCars, rest)) (string "list cars" input)
+
+parseServiceCar :: Parser Query
+parseServiceCar = and5' ServiceCar (string "service car ") parseLicensePlate (string " ") parseWord (string " ") parseWord
+
+parseListServices :: Parser Query
+parseListServices = do
+    (_, rest1) <- string "list services "
+    (plate, rest2) <- parseLicensePlate rest1
+    return (ListServices plate, rest2)
+
+-- Combine all parsers in parseQuery
+parseQuery :: Parser Query
+parseQuery = parseAddCar `or2` parseRemoveCar `or2` parseListCars `or2` parseServiceCar `or2` parseListServices
+
+-- State transition function
+stateTransition :: Query -> State -> State
+stateTransition (AddCar plate make model year) (State cars services) =
+  State (Car plate make model year : cars) services
+stateTransition (RemoveCar plate) (State cars services) =
+  State (filter (\car -> licensePlate car /= plate) cars) services
+stateTransition ListCars state = state
+stateTransition (ServiceCar plate serviceType date) (State cars services) =
+  State cars (Service plate serviceType date : services)
+stateTransition (ListServices plate) state = state
+
+-- Main function for testing
+main :: IO ()
+main = do
+  print (parseQuery "add car ABC123 Toyota Corolla 2020") -- should parse as `AddCar`
+  print (parseQuery "remove car ABC123") -- should parse as `RemoveCar`
+  print (parseQuery "list cars") -- should parse as `ListCars`
+  print (parseQuery "service car ABC123 Oil 12-12-2022") -- should parse as `ServiceCar`
