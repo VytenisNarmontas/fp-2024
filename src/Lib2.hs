@@ -1,101 +1,128 @@
-import qualified Data.Char as C
-import qualified Data.List as L
+module Lib2
+    ( parseQuery
+    , emptyState
+    , stateTransition
+    , Command(..)
+    , Car(..)
+    , Service(..)
+    , State(..)
+    ) where
 
-type Parser a = String -> Either String (a, String)
+import Data.List (find, delete)
 
--- Helper parsers
-char :: Char -> Parser Char
-char c [] = Left ("Cannot find " ++ [c] ++ " in an empty input")
-char c (x:xs) = if c == x then Right (c, xs) else Left ([c] ++ " is not found at the start")
+-- Define the types for Car and Service
+data Car = Car
+  { carPlate :: String
+  , carMake  :: String
+  , carModel :: String
+  , carYear  :: Int
+  } deriving (Show, Eq)
 
-string :: String -> Parser String
-string "" str = Right ("", str)
-string (c:cs) str = do
-  (_, rest) <- char c str
-  (parsed, rest') <- string cs rest
-  return (c : parsed, rest')
+data Service = Service
+  { serviceCarPlate :: String
+  , serviceType     :: String
+  , serviceDate     :: String
+  } deriving (Show)
 
-whitespace :: Parser String
-whitespace input = Right (span C.isSpace input)
+-- Define the State of the system
+data State = State
+  { cars     :: [Car]
+  , services :: [Service]
+  } deriving (Show)
 
-parseWord :: Parser String
-parseWord input = 
-  let (letters, rest) = span C.isLetter input
-  in if null letters 
-     then Left "Expected a word"
-     else Right (letters, rest)
+-- Define the commands that can be parsed
+data Command
+  = AddCar String String String Int        -- Plate, Make, Model, Year
+  | RemoveCar String                       -- Plate
+  | ServiceCar String String String        -- Plate, Service Type, Date
+  | ListCars                               -- List all cars
+  | ListServices String                    -- List services for a specific car
+  deriving (Show)
 
-parseNumber :: Parser Int
-parseNumber input = 
-  let (digits, rest) = span C.isDigit input
-  in if null digits 
-     then Left "Expected a number"
-     else Right (read digits, rest)
+-- The state transition function that handles commands
+stateTransition :: State -> Command -> Either String ([String], State)
+stateTransition state@(State oldCars oldServices) cmd = case cmd of
+    AddCar plate make model year ->
+        case findCar plate oldCars of
+            Just _ -> Left "Car with this plate already exists"
+            Nothing -> Right (["Car added: " ++ plate], State (newCar : oldCars) oldServices)
+                where newCar = Car plate make model year
+    
+    RemoveCar plate ->
+        case findCar plate oldCars of
+            Nothing -> Left "Car not found"
+            Just car -> Right (["Car removed: " ++ plate], State (delete car oldCars) oldServices)
 
--- Specific parsers for car parameters
-parseLicensePlate :: Parser String
-parseLicensePlate = parseWord  -- Simplified; assumes license plate is a word
+    ServiceCar plate sType date ->
+        case findCar plate oldCars of
+            Nothing -> Left "Car not found"
+            Just _ -> Right (["Car serviced: " ++ plate], State oldCars (newService : oldServices))
+                where newService = Service plate sType date
 
-parseMake :: Parser String
-parseMake = parseWord
+    ListCars -> 
+        Right (map show oldCars, state)
 
-parseModel :: Parser String
-parseModel = parseWord
+    ListServices plate ->
+        case findCar plate oldCars of
+            Nothing -> Left "Car not found"
+            Just _ -> Right (map show $ filter (\s -> serviceCarPlate s == plate) oldServices, state)
 
-parseYear :: Parser Int
-parseYear = parseNumber
+-- Helper function to find a car by plate
+findCar :: String -> [Car] -> Maybe Car
+findCar plate = find (\car -> carPlate car == plate)
 
--- and combinator for 5 parsers
-and5' :: (a -> b -> c -> d -> e -> f) -> Parser a -> Parser b -> Parser c -> Parser d -> Parser e -> Parser f
-and5' f pa pb pc pd pe = \input -> do
-    (a, r1) <- pa input
-    (b, r2) <- pb r1
-    (c, r3) <- pc r2
-    (d, r4) <- pd r3
-    (e, r5) <- pe r4
-    return (f a b c d e, r5)
+-- <add_car> ::= "add" "car" <plate> <make> <model> <year>
+parseAddCar :: String -> Either String Command
+parseAddCar input =
+    case words input of
+        ("add" : "car" : plate : make : model : yearStr : _) ->
+            case reads yearStr of
+                [(year, "")] -> Right (AddCar plate make model year)
+                _ -> Left "Invalid year format"
+        _ -> Left "Invalid add car command"
 
--- Command parsers
-parseAddCar :: Parser Query
-parseAddCar = and5' AddCar (string "add car ") parseLicensePlate (string " ") parseMake (string " ") parseModel (string " ") parseYear
+-- <remove_car> ::= "remove" "car" <plate>
+parseRemoveCar :: String -> Either String Command
+parseRemoveCar input =
+    case words input of
+        ("remove" : "car" : plate : _) -> Right (RemoveCar plate)
+        _ -> Left "Invalid remove car command"
 
-parseRemoveCar :: Parser Query
-parseRemoveCar = do
-    (_, rest1) <- string "remove car "
-    (plate, rest2) <- parseLicensePlate rest1
-    return (RemoveCar plate, rest2)
+-- <service_car> ::= "service" "car" <plate> <service_type> <date>
+parseServiceCar :: String -> Either String Command
+parseServiceCar input =
+    case words input of
+        ("service" : "car" : plate : sType : date : _) -> 
+            Right (ServiceCar plate sType date)
+        _ -> Left "Invalid service car command"
 
-parseListCars :: Parser Query
-parseListCars input = fmap (\(_, rest) -> (ListCars, rest)) (string "list cars" input)
+-- <list_cars> ::= "list" "cars"
+parseListCars :: String -> Either String Command
+parseListCars input =
+    case words input of
+        ("list" : "cars" : _) -> Right ListCars
+        _ -> Left "Invalid list cars command"
 
-parseServiceCar :: Parser Query
-parseServiceCar = and5' ServiceCar (string "service car ") parseLicensePlate (string " ") parseWord (string " ") parseWord
+-- <list_services> ::= "list" "services" <plate>
+parseListServices :: String -> Either String Command
+parseListServices input =
+    case words input of
+        ("list" : "services" : plate : _) -> Right (ListServices plate)
+        _ -> Left "Invalid list services command"
 
-parseListServices :: Parser Query
-parseListServices = do
-    (_, rest1) <- string "list services "
-    (plate, rest2) <- parseLicensePlate rest1
-    return (ListServices plate, rest2)
+-- <query> ::= <add_car> | <remove_car> | <service_car> | <list_cars> | <list_services>
+parseQuery :: String -> Either String Command
+parseQuery input = parseAddCar input
+    `orElse` parseRemoveCar input
+    `orElse` parseServiceCar input
+    `orElse` parseListCars input
+    `orElse` parseListServices input
+  where
+    orElse :: Either String Command -> Either String Command -> Either String Command
+    orElse (Right res) _ = Right res
+    orElse _ (Right res) = Right res
+    orElse (Left _) (Left _) = Left "Invalid command"
 
--- Combine all parsers in parseQuery
-parseQuery :: Parser Query
-parseQuery = parseAddCar `or2` parseRemoveCar `or2` parseListCars `or2` parseServiceCar `or2` parseListServices
-
--- State transition function
-stateTransition :: Query -> State -> State
-stateTransition (AddCar plate make model year) (State cars services) =
-  State (Car plate make model year : cars) services
-stateTransition (RemoveCar plate) (State cars services) =
-  State (filter (\car -> licensePlate car /= plate) cars) services
-stateTransition ListCars state = state
-stateTransition (ServiceCar plate serviceType date) (State cars services) =
-  State cars (Service plate serviceType date : services)
-stateTransition (ListServices plate) state = state
-
--- Main function for testing
-main :: IO ()
-main = do
-  print (parseQuery "add car ABC123 Toyota Corolla 2020") -- should parse as `AddCar`
-  print (parseQuery "remove car ABC123") -- should parse as `RemoveCar`
-  print (parseQuery "list cars") -- should parse as `ListCars`
-  print (parseQuery "service car ABC123 Oil 12-12-2022") -- should parse as `ServiceCar`
+-- Initial empty state
+emptyState :: State
+emptyState = State [] []
