@@ -32,10 +32,14 @@ data ServiceType = SimpleService String
 
 instance Show ServiceType where
     show (SimpleService s) = s
-    show (NestedService s services) = s ++ "(" ++ showServices services ++ ")"
+    show (NestedService s services) = 
+        s ++ "(" ++ showServices services  -- Close parentheses correctly
 
+-- Show services as a properly formatted string
 showServices :: [ServiceType] -> String
-showServices = foldr1 (\a b -> a ++ ", " ++ b) . map show
+showServices [] = ""
+showServices [x] = show x
+showServices (x:xs) = show x ++ ", " ++ showServices xs
 
 data State = State
   { cars     :: [Car]
@@ -159,27 +163,14 @@ parseServiceType input =
 
 -- Parses a nested list of services, handling nested parentheses correctly
 parseNestedList :: String -> Int -> ([ServiceType], String)
-parseNestedList input depth = 
-    let input' = trim input
-    in case input' of
-        [] -> ([], [])
-        (')':rest) 
-            | depth > 0 -> 
-                let (services, remaining) = parseNestedList rest (depth - 1)
-                in (services, remaining)
-            | otherwise -> ([], rest)
-        ('(':rest) -> parseNestedList rest (depth + 1)
-        ',' : rest | depth == 0 -> 
-            let (services, remaining) = parseNestedList rest depth
-            in (services, rest)
-        _ | depth == 0 -> 
-            let (service, remaining) = parseServiceType input'
-                (services, rest) = parseNestedList (trim remaining) depth
-            in (service : services, rest)
-          | otherwise -> 
-            let (service, remaining) = parseServiceType input'
-                (services, rest) = parseNestedList remaining depth
-            in (service : services, rest)
+parseNestedList input depth = case input of
+    [] -> ([], [])
+    (')' : rest) | depth > 0 -> ([], rest)  -- Properly handle closing parentheses
+    (',' : rest) | depth == 0 -> parseNestedList rest depth  -- Skip top-level commas
+    _ ->
+        let (service, remaining) = parseServiceType input
+            (nextServices, rest) = parseNestedList (trim remaining) depth
+        in (service : nextServices, rest)
 
 parseListCars :: String -> Either String Command
 parseListCars input =

@@ -1,4 +1,7 @@
 list services ABC123
+service car ABC123 front(oil change(oil filter, oil)) 2024-01-01
+add car ABC123 Toyota Corolla 2020
+list services ABC123
 service car ABC123 oil(oil(oil)) 2024-01-01
 service car ABC12 oil 2024-01-01
 list services ABC123
