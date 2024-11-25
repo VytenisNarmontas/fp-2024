@@ -146,23 +146,40 @@ splitTopLevelServices input = split 0 "" [] input
 trim :: String -> String
 trim = reverse . dropWhile (== ' ') . reverse . dropWhile (== ' ')
 
+-- Parses a service type, handling both simple and nested cases
 parseServiceType :: String -> (ServiceType, String)
 parseServiceType input = 
     let input' = trim input
     in case break (== '(') input' of
         (name, "") -> (SimpleService (trim name), "")
         (name, '(':rest) -> 
-            let (services, remaining) = parseNestedList rest
-            in (NestedService (trim name) services, remaining)
+            let (services, remaining) = parseNestedList rest 0
+            in (NestedService (trim name) services, trim remaining)
         _ -> error "Unexpected service format"
 
-parseNestedList :: String -> ([ServiceType], String)
-parseNestedList input = 
-    case break (== ')') input of
-        (content, ')':rest) -> 
-            let services = parseServiceList content
+-- Parses a nested list of services, handling nested parentheses correctly
+parseNestedList :: String -> Int -> ([ServiceType], String)
+parseNestedList input depth = 
+    let input' = trim input
+    in case input' of
+        [] -> ([], [])
+        (')':rest) 
+            | depth > 0 -> 
+                let (services, remaining) = parseNestedList rest (depth - 1)
+                in (services, remaining)
+            | otherwise -> ([], rest)
+        ('(':rest) -> parseNestedList rest (depth + 1)
+        ',' : rest | depth == 0 -> 
+            let (services, remaining) = parseNestedList rest depth
             in (services, rest)
-        _ -> error "Mismatched parentheses in service list"
+        _ | depth == 0 -> 
+            let (service, remaining) = parseServiceType input'
+                (services, rest) = parseNestedList (trim remaining) depth
+            in (service : services, rest)
+          | otherwise -> 
+            let (service, remaining) = parseServiceType input'
+                (services, rest) = parseNestedList remaining depth
+            in (service : services, rest)
 
 parseListCars :: String -> Either String Command
 parseListCars input =
