@@ -97,6 +97,7 @@ stateTransition state@(State oldCars oldServices) cmd = case cmd of
 findCar :: String -> [Car] -> Maybe Car
 findCar plate = find (\car -> carPlate car == plate)
 
+
 -- Central parsing function that attempts to parse various command types
 parseQuery :: String -> Either String Command
 parseQuery input = parseAddCar input

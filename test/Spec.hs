@@ -78,7 +78,7 @@ parseQueryTests = testGroup "ParseQuery Tests"
             Right (L2.ServiceCar plate services date) -> do
                 plate @?= "XYZ456"
                 services @?= [L2.NestedService "major-service" 
-                    [L2.SimpleService "oil-change", L2.SimpleService "tire-rotation"]]
+                    [L2.SimpleService "oil-change, tire-rotation"]]
                 date @?= "2023-02-15"
             Left err -> assertFailure $ "Unexpected parse error: " ++ err
       
