@@ -33,7 +33,7 @@ data ServiceType = SimpleService String
 instance Show ServiceType where
     show (SimpleService s) = s
     show (NestedService s services) = 
-        s ++ "(" ++ showServices services  -- Close parentheses correctly
+        s ++ "(" ++ showServices services ++ ")"  -- Correctly formatted nested services
 
 -- Show services as a properly formatted string
 showServices :: [ServiceType] -> String
@@ -124,7 +124,18 @@ parseServiceCar input =
 
 parseServiceList :: String -> [ServiceType]
 parseServiceList input = 
-    map (fst . parseServiceType . trim) (splitTopLevelServices input)
+    sanitizeParsedServices $ map (fst . parseServiceType . trim) (splitTopLevelServices input)
+
+sanitizeParsedServices :: [ServiceType] -> [ServiceType]
+sanitizeParsedServices = map sanitizeServiceType
+
+sanitizeServiceType :: ServiceType -> ServiceType
+sanitizeServiceType (SimpleService s) = SimpleService (trimUnmatched s)
+sanitizeServiceType (NestedService s services) = 
+    NestedService (trimUnmatched s) (sanitizeParsedServices services)
+
+trimUnmatched :: String -> String
+trimUnmatched = reverse . dropWhile (== ')') . reverse . dropWhile (== '(')
 
 splitAtLastSpace :: String -> (String, String)
 splitAtLastSpace input =
@@ -155,22 +166,28 @@ parseServiceType :: String -> (ServiceType, String)
 parseServiceType input = 
     let input' = trim input
     in case break (== '(') input' of
-        (name, "") -> (SimpleService (trim name), "")
+        (name, "") -> (SimpleService (trim name), "")  -- Simple service
         (name, '(':rest) -> 
-            let (services, remaining) = parseNestedList rest 0
+            let (services, remaining) = parseNestedList rest 1
             in (NestedService (trim name) services, trim remaining)
-        _ -> error "Unexpected service format"
+        _ -> error $ "Unexpected service format: " ++ input
+
 
 -- Parses a nested list of services, handling nested parentheses correctly
 parseNestedList :: String -> Int -> ([ServiceType], String)
-parseNestedList input depth = case input of
-    [] -> ([], [])
-    (')' : rest) | depth > 0 -> ([], rest)  -- Properly handle closing parentheses
-    (',' : rest) | depth == 0 -> parseNestedList rest depth  -- Skip top-level commas
-    _ ->
-        let (service, remaining) = parseServiceType input
-            (nextServices, rest) = parseNestedList (trim remaining) depth
-        in (service : nextServices, rest)
+parseNestedList input depth = go (trim input) depth []
+  where
+    go [] _ acc = (reverse acc, [])  -- End of input
+    go (')':rest) 1 acc = (reverse acc, trim rest)  -- Close top-level nesting correctly
+    go (')':rest) d acc = go rest (d - 1) acc  -- Handle unmatched `)`
+    go ('(':rest) d acc = 
+        let (service, remaining) = parseServiceType ('(':rest)
+        in go remaining (d + 1) (service : acc)  -- Parse nested service
+    go (',':rest) d acc = go rest d acc  -- Skip commas at the top level
+    go str d acc = 
+        let (service, remaining) = parseServiceType str
+        in go remaining d (service : acc)  -- Parse the next service
+
 
 parseListCars :: String -> Either String Command
 parseListCars input =
