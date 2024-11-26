@@ -12,77 +12,92 @@ module Lib2
 import Data.List (find, delete)
 import Data.Char (isAlpha, isDigit)
 
--- Define the types for Car and Service
-data Car = Car
-  { carPlate :: String
-  , carMake  :: String
-  , carModel :: String
-  , carYear  :: Int
-  } deriving (Show, Eq)
 
+-- Each car has a unique plate number, make, model, and year of manufacture
+data Car = Car
+  { carPlate :: String  -- (e.g., ABC123)
+  , carMake  :: String  -- (e.g., Toyota, Ford)
+  , carModel :: String  -- (e.g., Camry, Mustang)
+  , carYear  :: Int     -- (e.g., 2020, 1995)
+  } deriving (Show, Eq) 
+
+-- Represents a service for a car
 data Service = Service
-  { serviceCarPlate :: String
-  , serviceTypes    :: [ServiceType]
-  , serviceDate     :: String
+  { serviceCarPlate :: String       -- License plate (e.g., ABC123)
+  , serviceTypes    :: [ServiceType] -- List of services performed
+  , serviceDate     :: String        -- Date of the service
   } deriving (Show)
 
-data ServiceType = SimpleService String
-                | NestedService String [ServiceType]
-                deriving (Eq)
+-- Service type representation supporting simple and nested services
+data ServiceType 
+  = SimpleService String            -- Basic service with a single type
+  | NestedService String [ServiceType]  -- Complex service with sub-services
+  deriving (Eq)
 
+-- Custom Show instance to provide readable representation of ServiceType
 instance Show ServiceType where
     show (SimpleService s) = s
     show (NestedService s services) = 
-        s ++ "(" ++ showServices services ++ ")"  -- Correctly formatted nested services
+        s ++ "(" ++ showServices services ++ ")"
 
--- Show services as a properly formatted string
+-- Helper function to convert a list of services to a readable string
 showServices :: [ServiceType] -> String
 showServices [] = ""
-showServices [x] = show x
+showServices [x] = show x 
 showServices (x:xs) = show x ++ ", " ++ showServices xs
 
+-- Tracking all cars and their service history
 data State = State
-  { cars     :: [Car]
-  , services :: [Service]
+  { cars     :: [Car]      -- List of all cars in the system
+  , services :: [Service]  -- List of all service records
   } deriving (Show)
 
+-- Defines possible commands that can be executed in the system
 data Command
-  = AddCar String String String Int
-  | RemoveCar String
-  | ServiceCar String [ServiceType] String
-  | ListCars
-  | ListServices String
+  = AddCar String String String Int         -- Add a new car (plate, make, model, year)
+  | RemoveCar String                        -- Remove a car by plate
+  | ServiceCar String [ServiceType] String  -- Service a car (plate, services, date)
+  | ListCars                                -- List all cars
+  | ListServices String                     -- List services for a specific car
   deriving (Show)
 
+-- Function that applies commands and manages system state
 stateTransition :: State -> Command -> Either String ([String], State)
 stateTransition state@(State oldCars oldServices) cmd = case cmd of
+    -- Prevents duplicate plates
     AddCar plate make model year -> 
         case findCar plate oldCars of
             Just _ -> Left "Car with this plate already exists"
             Nothing -> Right (["Car added: " ++ plate], State (newCar : oldCars) oldServices)
                 where newCar = Car plate make model year
     
+    -- Ensures car exists before removal
     RemoveCar plate -> 
         case findCar plate oldCars of
             Nothing -> Left "Car not found"
             Just car -> Right (["Car removed: " ++ plate], State (delete car oldCars) oldServices)
 
+    -- Adding a service record to a car
     ServiceCar plate serviceTypes date -> 
         case findCar plate oldCars of
             Nothing -> Left "Car not found"
             Just _ -> Right (["Car serviced: " ++ plate], State oldCars (Service plate serviceTypes date : oldServices))
 
+    -- List all cars in the system
     ListCars -> 
         Right (map show oldCars, state)
 
+    -- List services for a car
     ListServices plate -> 
         case findCar plate oldCars of
             Nothing -> Left "Car not found"
             Just _ -> Right (map show $ filter (\s -> serviceCarPlate s == plate) oldServices, state)
 
+-- Function to find a car by its plate
 findCar :: String -> [Car] -> Maybe Car
 findCar plate = find (\car -> carPlate car == plate)
 
+-- Central parsing function that attempts to parse various command types
 parseQuery :: String -> Either String Command
 parseQuery input = parseAddCar input
     `orElse` parseRemoveCar input
@@ -90,12 +105,14 @@ parseQuery input = parseAddCar input
     `orElse` parseListCars input
     `orElse` parseListServices input
   where
+    -- Custom combinator to chain parsing attempts, returning first successful parse
     orElse :: Either String Command -> Either String Command -> Either String Command
-    orElse (Right res) _ = Right res
+    orElse (Right res) _ = Right res  -- First successful parse wins
     orElse _ (Right res) = Right res
-    orElse (Left msg1) (Left msg2) = Left (msg1 ++ " or " ++ msg2)
+    orElse (Left msg1) (Left msg2) = Left (msg1 ++ " or " ++ msg2)  -- Combine error messages
     orElse _ _ = Left "Invalid command"
 
+-- Parses commands to add a new car
 parseAddCar :: String -> Either String Command
 parseAddCar input =
     case words input of
@@ -105,12 +122,14 @@ parseAddCar input =
                 _ -> Left "Invalid year format"
         _ -> Left "Invalid add car command"
 
+-- Parses commands to remove a car
 parseRemoveCar :: String -> Either String Command
 parseRemoveCar input =
     case words input of
         ("remove" : "car" : plate : _) -> Right (RemoveCar plate)
         _ -> Left "Invalid remove car command"
 
+-- Parser for car nested service types
 parseServiceCar :: String -> Either String Command
 parseServiceCar input = 
     case words input of
@@ -122,84 +141,93 @@ parseServiceCar input =
                 else Left $ "Invalid service car command: missing date. serviceStr: " ++ serviceStr ++ ", dateStr: " ++ dateStr
         _ -> Left "Invalid service car command"
 
+-- Converts a string of services into a list of ServiceType
 parseServiceList :: String -> [ServiceType]
 parseServiceList input = 
     sanitizeParsedServices $ map (fst . parseServiceType . trim) (splitTopLevelServices input)
 
+-- Remove extra parentheses and whitespace
 sanitizeParsedServices :: [ServiceType] -> [ServiceType]
 sanitizeParsedServices = map sanitizeServiceType
 
+-- Recursively sanitizes a single service type
 sanitizeServiceType :: ServiceType -> ServiceType
 sanitizeServiceType (SimpleService s) = SimpleService (trimUnmatched s)
 sanitizeServiceType (NestedService s services) = 
     NestedService (trimUnmatched s) (sanitizeParsedServices services)
 
+-- Removes unmatched parentheses from the beginning and end of a string
 trimUnmatched :: String -> String
 trimUnmatched = reverse . dropWhile (== ')') . reverse . dropWhile (== '(')
 
+-- Splits input string at the last space, returning services and date
 splitAtLastSpace :: String -> (String, String)
 splitAtLastSpace input =
     case breakAtLastSpace input of
         (before, after) -> (trim before, trim after)
 
+-- Breaks a string at the last space, reversing to handle from the end
 breakAtLastSpace :: String -> (String, String)
 breakAtLastSpace str =
     let reversed = reverse str
         (revAfter, revBefore) = break (== ' ') reversed
     in (reverse revBefore, reverse revAfter)
 
+-- Parser to split service types
 splitTopLevelServices :: String -> [String]
 splitTopLevelServices input = split 0 "" [] input
   where
     split _ curr acc [] = if null curr then acc else acc ++ [reverse curr]
     split depth curr acc (c:cs)
-        | c == '(' = split (depth + 1) (c:curr) acc cs
-        | c == ')' = split (depth - 1) (c:curr) acc cs
-        | c == ',' && depth == 0 = split depth "" (acc ++ [reverse curr]) cs
+        | c == '(' = split (depth + 1) (c:curr) acc cs  -- Increase depth for nested parentheses
+        | c == ')' = split (depth - 1) (c:curr) acc cs  -- Decrease depth
+        | c == ',' && depth == 0 = split depth "" (acc ++ [reverse curr]) cs  -- Split at top-level commas
         | otherwise = split depth (c:curr) acc cs
 
+-- Removes leading and trailing whitespace from a string
 trim :: String -> String
 trim = reverse . dropWhile (== ' ') . reverse . dropWhile (== ' ')
 
--- Parses a service type, handling both simple and nested cases
+-- Parses individual service types, handling both simple and nested formats
 parseServiceType :: String -> (ServiceType, String)
 parseServiceType input = 
     let input' = trim input
     in case break (== '(') input' of
-        (name, "") -> (SimpleService (trim name), "")  -- Simple service
+        (name, "") -> (SimpleService (trim name), "")  -- Simple service case
         (name, '(':rest) -> 
             let (services, remaining) = parseNestedList rest 1
             in (NestedService (trim name) services, trim remaining)
         _ -> error $ "Unexpected service format: " ++ input
 
-
--- Parses a nested list of services, handling nested parentheses correctly
+-- Recursively parses nested service lists
 parseNestedList :: String -> Int -> ([ServiceType], String)
 parseNestedList input depth = go (trim input) depth []
   where
-    go [] _ acc = (reverse acc, [])  -- End of input
-    go (')':rest) 1 acc = (reverse acc, trim rest)  -- Close top-level nesting correctly
-    go (')':rest) d acc = go rest (d - 1) acc  -- Handle unmatched `)`
+    go [] _ acc = (reverse acc, []) 
+    go (')':rest) 1 acc = (reverse acc, trim rest)
+    go (')':rest) d acc = go rest (d - 1) acc 
     go ('(':rest) d acc = 
         let (service, remaining) = parseServiceType ('(':rest)
-        in go remaining (d + 1) (service : acc)  -- Parse nested service
-    go (',':rest) d acc = go rest d acc  -- Skip commas at the top level
+        in go remaining (d + 1) (service : acc)  
+    go (',':rest) d acc = go rest d acc 
     go str d acc = 
         let (service, remaining) = parseServiceType str
-        in go remaining d (service : acc)  -- Parse the next service
+        in go remaining d (service : acc) 
 
-
+-- Parses commands to list all cars
 parseListCars :: String -> Either String Command
 parseListCars input =
     case words input of
         ("list" : "cars" : _) -> Right ListCars
         _ -> Left "Invalid list cars command"
 
+-- Parses commands to list services for a specific car
 parseListServices :: String -> Either String Command
 parseListServices input =
     case words input of
         ("list" : "services" : plate : _) -> Right (ListServices plate)
         _ -> Left "Invalid list services command"
 
+-- Creates an initial empty state with no cars or services
 emptyState :: State
 emptyState = State [] []
