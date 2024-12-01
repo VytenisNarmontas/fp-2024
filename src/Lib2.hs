@@ -10,8 +10,41 @@ module Lib2
     ) where
 
 import Data.List (find, delete)
-import Data.Char (isAlpha, isDigit)
+import Data.Char (isAlpha, isDigit, isAlphaNum)
 
+type Parser a = String -> Either String (a, String)
+
+and2 :: (a -> b -> c) -> Parser a -> Parser b -> Parser c
+and2 f a b = \input ->
+    case a input of
+        Right (v1, r1) ->
+            case b r1 of
+                Right (v2, r2) -> Right (f v1 v2, r2)
+                Left e2 -> Left e2
+        Left e1 -> Left e1
+
+or2 :: Parser a -> Parser a -> Parser a
+or2 a b = \input ->
+    case a input of
+        Right r1 -> Right r1
+        Left e1 ->
+            case b input of
+                Right r2 -> Right r2
+                Left e2 -> Left (e1 ++ ", " ++ e2)
+
+parseString :: String -> Parser String
+parseString str [] = Left ("Cannot find " ++ str ++ " in an empty input")
+parseString str input 
+    | take (length str) input == str = Right (str, drop (length str) input)
+    | otherwise = Left ("Cannot find " ++ str ++ " in " ++ input)
+
+parsePlate :: Parser String
+parsePlate [] = Left "Empty input, cannot parse plate"
+parsePlate input =
+    let (plate, rest) = span isAlphaNum input
+    in if null plate 
+        then Left "Invalid plate format"
+        else Right (plate, rest)
 
 -- Each car has a unique plate number, make, model, and year of manufacture
 data Car = Car
@@ -97,6 +130,22 @@ stateTransition state@(State oldCars oldServices) cmd = case cmd of
 findCar :: String -> [Car] -> Maybe Car
 findCar plate = find (\car -> carPlate car == plate)
 
+-- Parses commands to remove a car
+parseRemoveCar :: String -> Either String Command
+parseRemoveCar input = 
+    let parser = and2 (\_ plate -> RemoveCar plate) 
+                 (parseString "remove car ")
+                 (parsePlate `or2` parseRemainderAsPlate)
+    in case parser input of
+        Right (cmd, _) -> Right cmd  -- Ignore any trailing input
+        Left err -> Left err
+
+parseRemainderAsPlate :: Parser String
+parseRemainderAsPlate input = 
+    let (plate, rest) = span isAlphaNum input
+    in if null plate 
+        then Left "Invalid plate format"
+        else Right (plate, rest)
 
 -- Central parsing function that attempts to parse various command types
 parseQuery :: String -> Either String Command
@@ -108,7 +157,7 @@ parseQuery input = parseAddCar input
   where
     -- Custom combinator to chain parsing attempts, returning first successful parse
     orElse :: Either String Command -> Either String Command -> Either String Command
-    orElse (Right res) _ = Right res  -- First successful parse wins
+    orElse (Right res) _ = Right res 
     orElse _ (Right res) = Right res
     orElse (Left msg1) (Left msg2) = Left (msg1 ++ " or " ++ msg2)  -- Combine error messages
     orElse _ _ = Left "Invalid command"
@@ -122,13 +171,6 @@ parseAddCar input =
                 [(year, "")] -> Right (AddCar plate make model year)
                 _ -> Left "Invalid year format"
         _ -> Left "Invalid add car command"
-
--- Parses commands to remove a car
-parseRemoveCar :: String -> Either String Command
-parseRemoveCar input =
-    case words input of
-        ("remove" : "car" : plate : _) -> Right (RemoveCar plate)
-        _ -> Left "Invalid remove car command"
 
 -- Parser for car nested service types
 parseServiceCar :: String -> Either String Command
