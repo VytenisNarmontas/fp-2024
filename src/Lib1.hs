@@ -10,5 +10,7 @@ completions =
       "remove car",
       "list cars",
       "service car",
-      "list services"
+      "list services",
+      "save",
+      "load"
     ]
